@@ -149,8 +149,14 @@ async function analyzeWithGemini(imageBase64) {
         - **ACTION FALLBACK**: If you want to FOLD but only a "PASS" button is available, recommend "FOLD" (the system will click the Fold/Pass marker).
 
         ### EXTRACTION RULES:
-        1. Identify cards, stacks, pot, and dealer button precisely. Look at button labels for Call/Check cost.
-        2. If cards are unclear, use suits and shapes for best-effort inference.
+        1. Identify cards, stacks, pot, and dealer button precisely. 
+        2. **SCRUTINIZE BUTTONS**: Look at the text on every button. If a button says "Check" or "Pass", the cost to continue is 0.
+        3. If cards are unclear, use suits and shapes for best-effort inference.
+
+        ### THE GOLDEN RULE (NO FOLDING FOR FREE):
+        - If 'cost_to_call' is 0, or if you detect a "Pass" or "Check" button, you MUST NOT RECOMMEND FOLDING. 
+        - Even if your hand is garbage, you must "Check" or "Pass". 
+        - Only recommend "Fold" if there is a positive cost to call (e.g. 2 BB, 50 chips).
 
         ### OUTPUT FORMAT:
         Return ONLY a JSON object. Extract the REAL numbers from the image.

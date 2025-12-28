@@ -374,7 +374,7 @@ async function loop() {
         document.getElementById('status').innerText = 'WAITING...';
         document.getElementById('status').style.color = '#888';
     }
-    setTimeout(loop, 2000);
+    setTimeout(loop, 200);
 }
 
 function performNativeClick(x, y) {
