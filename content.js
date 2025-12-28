@@ -426,10 +426,16 @@ function performNativeClick(x, y) {
     const hub = document.getElementById('poker-pro-hub');
     const markers = ['fold', 'call', 'raise', 'sitback'].map(id => document.getElementById('marker-' + id));
 
-    if (hub) hub.style.display = 'none';
-    markers.forEach(m => { if (m) m.style.display = 'none'; });
+    // Temporarily disable pointer events so we can "see through" the UI to the site
+    if (hub) hub.style.pointerEvents = 'none';
+    markers.forEach(m => { if (m) m.style.pointerEvents = 'none'; });
 
     const el = document.elementFromPoint(x, y);
+
+    // Re-enable pointer events immediately so user can still interact with the UI
+    if (hub) hub.style.pointerEvents = 'auto';
+    markers.forEach(m => { if (m) m.style.pointerEvents = 'auto'; });
+
     if (el) {
         console.log('Dispatching Click:', el.tagName);
         const props = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, buttons: 1 };
@@ -441,12 +447,6 @@ function performNativeClick(x, y) {
         document.body.appendChild(dot);
         setTimeout(() => dot.remove(), 1000);
     }
-
-    // UI PERSISTENCE: Bring back the control panel after the click is done
-    setTimeout(() => {
-        if (hub) hub.style.display = 'block';
-        markers.forEach(m => { if (m) m.style.display = 'flex'; });
-    }, 3000);
 }
 
 chrome.runtime.onMessage.addListener((m) => {
