@@ -14,19 +14,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.type === 'PERFORM_ANALYSIS') {
-        handleVisionAnalysis(sender.tab.id);
+        handleVisionAnalysis(sender.tab);
         return true;
     }
 });
 
-async function handleVisionAnalysis(tabId) {
+async function handleVisionAnalysis(tab) {
+    const tabId = tab.id;
+    const windowId = tab.windowId;
     try {
         console.log('Capturing for Gemini...');
-        const dataUrl = await new Promise(resolve => {
-            chrome.tabs.captureVisibleTab(null, { format: 'png' }, resolve);
+        const dataUrl = await new Promise((resolve, reject) => {
+            chrome.tabs.captureVisibleTab(windowId, { format: 'png' }, (dataUrl) => {
+                if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else if (!dataUrl) {
+                    reject(new Error('Failed to capture screen (DataURL empty)'));
+                } else {
+                    resolve(dataUrl);
+                }
+            });
         });
-
-        if (!dataUrl) throw new Error('Failed to capture screen');
 
         const result = await analyzeWithGemini(dataUrl);
 
