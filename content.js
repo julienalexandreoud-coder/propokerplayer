@@ -17,9 +17,11 @@ let presets = {}; // Site presets (Layouts)
 let customStrategies = {}; // User-made strategy prompts
 let currentPresetName = 'Default';
 let matchThreshold = 25000;
+let actionCooldown = 3000;
+let sitBackTimeout = 45000;
 
 // Load initial config
-chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash', 'customPrompt', 'presets', 'currentPresetName', 'customStrategies', 'matchThreshold'], (data) => {
+chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash', 'customPrompt', 'presets', 'currentPresetName', 'customStrategies', 'matchThreshold', 'actionCooldown', 'sitBackTimeout'], (data) => {
     if (data.roi) roi = data.roi;
     if (data.buttonCoords) buttonCoords = data.buttonCoords;
     if (data.apiKey) apiKey = data.apiKey;
@@ -30,6 +32,8 @@ chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 't
     if (data.currentPresetName) currentPresetName = data.currentPresetName;
     if (data.customStrategies) customStrategies = data.customStrategies;
     if (data.matchThreshold) matchThreshold = data.matchThreshold;
+    if (data.actionCooldown) actionCooldown = data.actionCooldown;
+    if (data.sitBackTimeout) sitBackTimeout = data.sitBackTimeout;
 
     if (IS_TOP_FRAME) {
         createCalibrationHub();
@@ -93,10 +97,25 @@ function createCalibrationHub() {
                 <span>Trigger Sensitivity</span>
                 <span id="threshold-val">${matchThreshold}</span>
             </div>
-            <input type="range" id="threshold-slider" min="5000" max="50000" step="1000" value="${matchThreshold}" style="width:100%; accent-color:#f59e0b; cursor:pointer;">
+            <input type="range" id="threshold-slider" min="5000" max="50000" step="1000" value="${matchThreshold}" style="width:100%; accent-color:#f59e0b; cursor:pointer; margin-bottom:8px;">
+            
+            <div style="display:flex; justify-content:space-between; font-size:9px; color:#444; margin-bottom:4px; text-transform:uppercase;">
+                <span>Action Cooldown (s)</span>
+                <span id="cooldown-val">${(actionCooldown / 1000).toFixed(1)}s</span>
+            </div>
+            <input type="range" id="cooldown-slider" min="500" max="10000" step="500" value="${actionCooldown}" style="width:100%; accent-color:#3b82f6; cursor:pointer; margin-bottom:8px;">
+
+            <div style="display:flex; justify-content:space-between; font-size:9px; color:#444; margin-bottom:4px; text-transform:uppercase;">
+                <span>SitBack Inactivity (s)</span>
+                <span id="sitback-val">${(sitBackTimeout / 1000).toFixed(0)}s</span>
+            </div>
+            <input type="range" id="sitback-slider" min="10000" max="300000" step="10000" value="${sitBackTimeout}" style="width:100%; accent-color:#10b981; cursor:pointer;">
         </div>
+
+        <div style="font-size:9px; color:#444; margin-bottom:4px; text-transform:uppercase;">4. Vision Monitor (ROI)</div>
+        <canvas id="roi-monitor" style="width:100%; height:60px; background:#050505; border:1px solid #222; border-radius:4px; margin-bottom:10px;"></canvas>
         
-        <button id="start-btn" style="${btnS('#10b981', 'black')} margin-top:10px; height:45px; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Start AI Operator</button>
+        <button id="start-btn" style="${btnS('#10b981', 'black')} margin-top:5px; height:45px; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Start AI Operator</button>
         
         <div id="status" style="font-size:10px; margin-top:15px; padding:10px; background:#050505; border-radius:6px; border-left:4px solid #333; color:#888;">Standby...</div>
         <div id="reasoning" style="font-size:10px; margin-top:10px; color:#eee; display:none; max-height:150px; overflow:auto; background:rgba(20,20,20,0.8); padding:10px; border-radius:6px; border:1px solid #222; white-space:pre-wrap; line-height:1.4;"></div>
@@ -123,6 +142,18 @@ function createCalibrationHub() {
         matchThreshold = parseInt(e.target.value);
         document.getElementById('threshold-val').innerText = matchThreshold;
         chrome.storage.local.set({ matchThreshold });
+    };
+
+    document.getElementById('cooldown-slider').oninput = (e) => {
+        actionCooldown = parseInt(e.target.value);
+        document.getElementById('cooldown-val').innerText = (actionCooldown / 1000).toFixed(1) + 's';
+        chrome.storage.local.set({ actionCooldown });
+    };
+
+    document.getElementById('sitback-slider').oninput = (e) => {
+        sitBackTimeout = parseInt(e.target.value);
+        document.getElementById('sitback-val').innerText = (sitBackTimeout / 1000).toFixed(0) + 's';
+        chrome.storage.local.set({ sitBackTimeout });
     };
 
     document.getElementById('api-key-input').onchange = (e) => {
@@ -315,6 +346,15 @@ async function getHash() {
                 const sW = roi.width * ratio, sH = roi.height * ratio;
                 c.width = Math.max(1, sW); c.height = Math.max(1, sH);
                 x.drawImage(img, sX, sY, sW, sH, 0, 0, c.width, c.height);
+
+                // Update Vision Monitor Overlay
+                const monitor = document.getElementById('roi-monitor');
+                if (monitor) {
+                    const mx = monitor.getContext('2d');
+                    monitor.width = c.width; monitor.height = c.height;
+                    mx.drawImage(c, 0, 0);
+                }
+
                 const d = x.getImageData(0, 0, c.width, c.height).data;
                 let sum = 0;
                 for (let i = 0; i < d.length; i += 100) sum += d[i] + d[i + 1] + d[i + 2];
@@ -417,7 +457,7 @@ async function loop() {
             setTimeout(() => {
                 isLoopPaused = false;
                 isTurnActive = false; // Force reset after pause to allow fresh detection
-            }, 3000);
+            }, actionCooldown);
         }
     } else {
         const matchP = target > 0 ? Math.max(0, Math.floor((1 - diff / matchThreshold) * 100)) : 0;
@@ -425,9 +465,9 @@ async function loop() {
         document.getElementById('status').innerText = `WATCHING: ${matchP}% match${debug}`;
         document.getElementById('status').style.color = '#888';
 
-        // Check for 45-second inactivity
-        if (isScanning && (Date.now() - lastTurnTime > 45000)) {
-            console.log('Inactivity detected (45s). Clicking Sit Back.');
+        // Check for inactivity
+        if (isScanning && (Date.now() - lastTurnTime > sitBackTimeout)) {
+            console.log(`Inactivity detected (${sitBackTimeout / 1000}s). Clicking Sit Back.`);
             if (buttonCoords.sitback) {
                 performNativeClick(buttonCoords.sitback.x, buttonCoords.sitback.y);
                 lastTurnTime = Date.now(); // Reset after clicking
