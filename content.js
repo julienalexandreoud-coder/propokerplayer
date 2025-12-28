@@ -289,7 +289,7 @@ function refreshMarkers() {
 async function getHash() {
     return new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'CAPTURE_SCREEN' }, (res) => {
-            if (!res || !res.dataUrl) return resolve('0');
+            if (!res || !res.dataUrl || res.error) return resolve('0');
             const img = new Image();
             img.onload = () => {
                 const ratio = window.devicePixelRatio || 1;
