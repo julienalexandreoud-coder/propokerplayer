@@ -77,9 +77,13 @@ function createCalibrationHub() {
         
         <textarea id="custom-prompt-input" placeholder="Custom Rules: e.g. If pair, go all-in." style="width:100%; height:70px; background:#050505; color:#0f0; border:1px solid #222; margin-bottom:15px; font-size:10px; padding:8px; border-radius:4px; resize:none; line-height:1.4;"></textarea>
 
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <div style="font-size:9px; color:#444; text-transform:uppercase;">3. Alignment & ROI</div>
+            <span id="reset-markers-btn" style="cursor:pointer; color:#ef4444; font-weight:bold; font-size:9px; border:1px solid #ef4444; padding:1px 4px; border-radius:3px;">RESET MARKERS</span>
+        </div>
         <div style="display:flex; gap:5px; margin-bottom:5px;">
-            <button id="set-roi-btn" style="${btnS('#0088ff', 'white')} flex:1;">3. Set ROI</button>
-            <button id="set-ref-btn" style="${btnS('#ffaa00', 'black')} flex:1;">4. My Turn</button>
+            <button id="set-roi-btn" style="${btnS('#0088ff', 'white')} flex:1;">Set ROI</button>
+            <button id="set-ref-btn" style="${btnS('#ffaa00', 'black')} flex:1;">My Turn</button>
         </div>
         
         <button id="start-btn" style="${btnS('#10b981', 'black')} margin-top:10px; height:45px; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Start AI Operator</button>
@@ -164,6 +168,18 @@ function createCalibrationHub() {
             chrome.storage.local.set({ currentPresetName, roi, buttonCoords, turnRefHash });
             refreshMarkers();
             document.getElementById('status').innerText = `Layout: ${name}`;
+        }
+    };
+
+    document.getElementById('reset-markers-btn').onclick = () => {
+        if (confirm("Reset all markers to default positions?")) {
+            buttonCoords = { fold: { x: 100, y: 150 }, call: { x: 200, y: 150 }, raise: { x: 300, y: 150 }, sitback: { x: 400, y: 150 } };
+            chrome.storage.local.set({ buttonCoords });
+            if (presets[currentPresetName]) {
+                presets[currentPresetName].buttonCoords = buttonCoords;
+                chrome.storage.local.set({ presets });
+            }
+            refreshMarkers();
         }
     };
 }
@@ -258,6 +274,7 @@ function createMarker(id, label, color) {
     const pos = buttonCoords[id] || { x: 100, y: 100 };
     m.style.left = pos.x - 30 + 'px';
     m.style.top = pos.y - 30 + 'px';
+    m.style.display = 'flex'; // Ensure it's visible
 }
 
 function refreshMarkers() {
