@@ -149,11 +149,10 @@ async function analyzeWithGemini(imageBase64) {
         - **Commitment Threshold**: If an action requires 30% or more of your stack, only proceed if you have a top-tier hand or a very high-equity draw.
         - **Stack Awareness**: Always compare the 'cost_to_call' to your 'my_stack'. If you are getting short-stacked (<20 BB), shift to an 'All-in or Fold' strategy.
 
-        ### STRATEGY RULES:
         ${config.rules}
         ${customPrompt ? `### USER CUSTOM RULES (PRIORITY):\n${customPrompt}` : ''}
         - If the pot is multi-way (3+ players), play more conservatively.
-        - **STRICT TECHNICAL RULE**: If the 'cost_to_call' is 0, or if you detect a "Check" or "Pass" button, you MUST recommend "Check" (or "Pass"). Many poker websites disable the "Fold" button when a free "Check" is available. To ensure the bot doesn't get stuck, you must never recommend "Fold" if it is free to stay in the hand.
+        - **VISUAL FALLBACK**: Usually you can Fold for free. However, if you see that the "FOLD" button is physically GONE from the screen (hidden by the site), recommend "CHECK" or "PASS" instead so you don't click on empty space.
 
         ### EXTRACTION RULES:
         1. Identify cards, stacks, pot, and dealer button precisely. 

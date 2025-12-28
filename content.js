@@ -422,22 +422,12 @@ function performNativeClick(x, y) {
 chrome.runtime.onMessage.addListener((m) => {
     if (m.type === 'SHOW_DECISION') {
         const rec = m.recommendation.toLowerCase();
-        let actionKey = rec.includes('fold') ? 'fold' :
+        const actionKey = rec.includes('fold') ? 'fold' :
             (rec.includes('call') || rec.includes('check')) ? 'call' :
                 rec.includes('raise') ? 'raise' : null;
 
-        // Safety Redirect: If AI wants to fold but the cost is 0 (free turn), click Check/Call instead.
-        const costStr = (m.state && m.state.cost_to_call) ? String(m.state.cost_to_call).toLowerCase() : "";
-        const isFree = costStr === "0" || costStr.includes("check") || costStr.includes("pass") || costStr === "";
-
-        if (actionKey === 'fold' && isFree) {
-            console.log('Action Redirected: Folding is free/impossible. Clicking Check instead.');
-            actionKey = 'call';
-        }
-
         if (IS_TOP_FRAME) {
-            const statusText = (actionKey === 'call' && rec.includes('fold')) ? 'FOLD (FREE CHECK)' : m.recommendation;
-            document.getElementById('status').innerText = 'RECOMMEND: ' + statusText;
+            document.getElementById('status').innerText = 'RECOMMEND: ' + m.recommendation;
             document.getElementById('status').style.color = '#ffffff';
             document.getElementById('reasoning').innerText = m.reasoning;
             document.getElementById('reasoning').style.display = 'block';
