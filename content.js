@@ -382,9 +382,9 @@ async function loop() {
         document.getElementById('status').innerText = 'WAITING...' + debug;
         document.getElementById('status').style.color = '#888';
 
-        // Check for 2-minute inactivity
-        if (isScanning && (Date.now() - lastTurnTime > 120000)) {
-            console.log('Inactivity detected (2min). Clicking Sit Back.');
+        // Check for 45-second inactivity
+        if (isScanning && (Date.now() - lastTurnTime > 45000)) {
+            console.log('Inactivity detected (45s). Clicking Sit Back.');
             if (buttonCoords.sitback) {
                 performNativeClick(buttonCoords.sitback.x, buttonCoords.sitback.y);
                 lastTurnTime = Date.now(); // Reset after clicking
