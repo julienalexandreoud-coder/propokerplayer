@@ -435,6 +435,23 @@ chrome.runtime.onMessage.addListener((m) => {
 
         if (actionKey && buttonCoords[actionKey]) {
             performNativeClick(buttonCoords[actionKey].x, buttonCoords[actionKey].y);
+
+            // 3-Second Fallback: If AI wants to fold but we are still stuck on this turn, click Check.
+            if (actionKey === 'fold') {
+                setTimeout(async () => {
+                    if (!isScanning) return;
+                    const h = await getHash();
+                    const current = parseInt(h) || 0;
+                    const target = parseInt(turnRefHash) || 0;
+                    const diff = Math.abs(current - target);
+                    if (h !== '0' && diff < 25000) {
+                        console.log('Fold failed/ignored. Triggering 3s Fallback: Clicking Check.');
+                        if (buttonCoords.call) {
+                            performNativeClick(buttonCoords.call.x, buttonCoords.call.y);
+                        }
+                    }
+                }, 3000);
+            }
         }
     }
 });
