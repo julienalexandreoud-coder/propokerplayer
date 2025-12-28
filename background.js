@@ -144,8 +144,9 @@ async function analyzeWithGemini(imageBase64) {
 
         ### STRATEGY RULES:
         ${config.rules}
-        ${customPrompt ? `### USER CUSTOM RULES:\n${customPrompt}` : ''}
+        ${customPrompt ? `### USER CUSTOM RULES (PRIORITY):\n${customPrompt}` : ''}
         - If the pot is multi-way (3+ players), play more conservatively.
+        - **ACTION FALLBACK**: If you want to FOLD but only a "PASS" button is available, recommend "FOLD" (the system will click the Fold/Pass marker).
 
         ### EXTRACTION RULES:
         1. Identify cards, stacks, pot, and dealer button precisely. Look at button labels for Call/Check cost.
