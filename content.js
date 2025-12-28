@@ -16,9 +16,10 @@ let customPromptValue = '';
 let presets = {}; // Site presets (Layouts)
 let customStrategies = {}; // User-made strategy prompts
 let currentPresetName = 'Default';
+let matchThreshold = 25000;
 
 // Load initial config
-chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash', 'customPrompt', 'presets', 'currentPresetName', 'customStrategies'], (data) => {
+chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash', 'customPrompt', 'presets', 'currentPresetName', 'customStrategies', 'matchThreshold'], (data) => {
     if (data.roi) roi = data.roi;
     if (data.buttonCoords) buttonCoords = data.buttonCoords;
     if (data.apiKey) apiKey = data.apiKey;
@@ -28,6 +29,7 @@ chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 't
     if (data.presets) presets = data.presets;
     if (data.currentPresetName) currentPresetName = data.currentPresetName;
     if (data.customStrategies) customStrategies = data.customStrategies;
+    if (data.matchThreshold) matchThreshold = data.matchThreshold;
 
     if (IS_TOP_FRAME) {
         createCalibrationHub();
@@ -81,9 +83,17 @@ function createCalibrationHub() {
             <div style="font-size:9px; color:#444; text-transform:uppercase;">3. Alignment & ROI</div>
             <span id="reset-markers-btn" style="cursor:pointer; color:#ef4444; font-weight:bold; font-size:9px; border:1px solid #ef4444; padding:1px 4px; border-radius:3px;">RESET MARKERS</span>
         </div>
-        <div style="display:flex; gap:5px; margin-bottom:5px;">
+        <div style="display:flex; gap:5px; margin-bottom:10px;">
             <button id="set-roi-btn" style="${btnS('#0088ff', 'white')} flex:1;">Set ROI</button>
             <button id="set-ref-btn" style="${btnS('#ffaa00', 'black')} flex:1;">My Turn</button>
+        </div>
+
+        <div style="margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; font-size:9px; color:#444; margin-bottom:4px; text-transform:uppercase;">
+                <span>Trigger Sensitivity</span>
+                <span id="threshold-val">${matchThreshold}</span>
+            </div>
+            <input type="range" id="threshold-slider" min="5000" max="50000" step="1000" value="${matchThreshold}" style="width:100%; accent-color:#f59e0b; cursor:pointer;">
         </div>
         
         <button id="start-btn" style="${btnS('#10b981', 'black')} margin-top:10px; height:45px; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Start AI Operator</button>
@@ -108,6 +118,12 @@ function createCalibrationHub() {
     document.getElementById('set-roi-btn').onclick = startROICalibration;
     document.getElementById('set-ref-btn').onclick = captureReference;
     document.getElementById('close-hub').onclick = () => hub.style.display = 'none';
+
+    document.getElementById('threshold-slider').oninput = (e) => {
+        matchThreshold = parseInt(e.target.value);
+        document.getElementById('threshold-val').innerText = matchThreshold;
+        chrome.storage.local.set({ matchThreshold });
+    };
 
     document.getElementById('api-key-input').onchange = (e) => {
         apiKey = e.target.value;
@@ -388,7 +404,7 @@ async function loop() {
 
     const debug = ` (${current}/${target})`;
 
-    if (h !== '0' && target !== 0 && diff < 25000) { // Much higher tolerance for easier detection
+    if (h !== '0' && target !== 0 && diff < matchThreshold) {
         lastTurnTime = Date.now();
         if (!isTurnActive) {
             isTurnActive = true;
@@ -404,7 +420,7 @@ async function loop() {
             }, 3000);
         }
     } else {
-        const matchP = target > 0 ? Math.max(0, Math.floor((1 - diff / 50000) * 100)) : 0;
+        const matchP = target > 0 ? Math.max(0, Math.floor((1 - diff / matchThreshold) * 100)) : 0;
         isTurnActive = false;
         document.getElementById('status').innerText = `WATCHING: ${matchP}% match${debug}`;
         document.getElementById('status').style.color = '#888';
