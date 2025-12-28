@@ -369,11 +369,11 @@ async function loop() {
 
     const debug = ` (${current}/${target})`;
 
-    if (h !== '0' && target !== 0 && diff < 12000) { // Increased tolerance
-        lastTurnTime = Date.now(); // Reset timer on turn detection
+    if (h !== '0' && target !== 0 && diff < 25000) { // Much higher tolerance for easier detection
+        lastTurnTime = Date.now();
         if (!isTurnActive) {
             isTurnActive = true;
-            document.getElementById('status').innerText = 'DECIDING...' + debug;
+            document.getElementById('status').innerText = '🔥 ACTIVE' + debug;
             document.getElementById('status').style.color = '#ffaa00';
             chrome.runtime.sendMessage({ type: 'PERFORM_ANALYSIS' });
         }
@@ -392,7 +392,7 @@ async function loop() {
             }
         }
     }
-    setTimeout(loop, 500); // 500ms is safer for screenshot capture stability
+    setTimeout(loop, 250); // Faster checks
 }
 
 function performNativeClick(x, y) {
