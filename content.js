@@ -10,6 +10,7 @@ let apiKey = '';
 let currentStrategy = 'gto';
 let turnRefHash = '';
 let isTurnActive = false;
+let lastTurnTime = Date.now();
 let customPromptValue = '';
 let presets = {}; // Site presets (Layouts)
 let customStrategies = {}; // User-made strategy prompts
@@ -363,6 +364,7 @@ async function loop() {
     const h = await getHash();
     const diff = Math.abs(parseInt(h) - parseInt(turnRefHash));
     if (h !== '0' && diff < 8000) {
+        lastTurnTime = Date.now(); // Reset timer on turn detection
         if (!isTurnActive) {
             isTurnActive = true;
             document.getElementById('status').innerText = 'DECIDING...';
@@ -373,6 +375,16 @@ async function loop() {
         isTurnActive = false;
         document.getElementById('status').innerText = 'WAITING...';
         document.getElementById('status').style.color = '#888';
+
+        // Check for 2-minute inactivity
+        if (isScanning && (Date.now() - lastTurnTime > 120000)) {
+            console.log('Inactivity detected (2min). Clicking Sit Back.');
+            if (buttonCoords.sitback) {
+                performNativeClick(buttonCoords.sitback.x, buttonCoords.sitback.y);
+                lastTurnTime = Date.now(); // Reset after clicking
+                document.getElementById('status').innerText = 'AUTO-SITBACK';
+            }
+        }
     }
     setTimeout(loop, 200);
 }
