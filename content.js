@@ -350,6 +350,7 @@ function toggleAgent() {
         btn.innerText = 'Stop Operator'; btn.style.background = '#ef4444'; btn.style.color = 'white';
         status.innerText = 'WATCHING: Online';
         status.style.color = '#22c55e';
+        lastTurnTime = Date.now(); // Reset on start
         loop();
     } else {
         btn.innerText = 'Start AI Operator'; btn.style.background = '#10b981'; btn.style.color = 'black';
@@ -362,18 +363,23 @@ function toggleAgent() {
 async function loop() {
     if (!isScanning || !IS_TOP_FRAME) return;
     const h = await getHash();
-    const diff = Math.abs(parseInt(h) - parseInt(turnRefHash));
-    if (h !== '0' && diff < 8000) {
+    const current = parseInt(h) || 0;
+    const target = parseInt(turnRefHash) || 0;
+    const diff = Math.abs(current - target);
+
+    const debug = ` (${current}/${target})`;
+
+    if (h !== '0' && target !== 0 && diff < 12000) { // Increased tolerance
         lastTurnTime = Date.now(); // Reset timer on turn detection
         if (!isTurnActive) {
             isTurnActive = true;
-            document.getElementById('status').innerText = 'DECIDING...';
+            document.getElementById('status').innerText = 'DECIDING...' + debug;
             document.getElementById('status').style.color = '#ffaa00';
             chrome.runtime.sendMessage({ type: 'PERFORM_ANALYSIS' });
         }
     } else {
         isTurnActive = false;
-        document.getElementById('status').innerText = 'WAITING...';
+        document.getElementById('status').innerText = 'WAITING...' + debug;
         document.getElementById('status').style.color = '#888';
 
         // Check for 2-minute inactivity
@@ -386,7 +392,7 @@ async function loop() {
             }
         }
     }
-    setTimeout(loop, 200);
+    setTimeout(loop, 500); // 500ms is safer for screenshot capture stability
 }
 
 function performNativeClick(x, y) {
