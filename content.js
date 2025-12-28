@@ -10,22 +10,29 @@ let apiKey = '';
 let currentStrategy = 'gto';
 let turnRefHash = '';
 let isTurnActive = false;
+let customPromptValue = '';
+let presets = {};
+let currentPresetName = 'Default';
 
-// Load config
-chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash', 'customPrompt'], (data) => {
+// Load initial config
+chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash', 'customPrompt', 'presets', 'currentPresetName'], (data) => {
     if (data.roi) roi = data.roi;
     if (data.buttonCoords) buttonCoords = data.buttonCoords;
     if (data.apiKey) apiKey = data.apiKey;
     if (data.currentStrategy) currentStrategy = data.currentStrategy;
     if (data.turnRefHash) turnRefHash = data.turnRefHash;
     if (data.customPrompt) customPromptValue = data.customPrompt;
-    if (IS_TOP_FRAME) refreshMarkers();
+    if (data.presets) presets = data.presets;
+    if (data.currentPresetName) currentPresetName = data.currentPresetName;
+
+    if (IS_TOP_FRAME) {
+        createCalibrationHub();
+        refreshMarkers();
+    }
 });
 
-let customPromptValue = '';
-
 function createCalibrationHub() {
-    if (!IS_TOP_FRAME) return;
+    if (!IS_TOP_FRAME || document.getElementById('poker-pro-hub')) return;
 
     const hub = document.createElement('div');
     hub.id = 'poker-pro-hub';
@@ -44,6 +51,14 @@ function createCalibrationHub() {
         
         <input type="password" id="api-key-input" placeholder="Gemini API Key" style="width:100%; background:#000; color:#0f0; border:1px solid #333; margin-bottom:12px; font-size:11px; padding:6px; border-radius:4px;">
         
+        <div style="font-size:10px; color:#666; margin-bottom:4px;">PRESET (SITE)</div>
+        <div style="display:flex; gap:4px; margin-bottom:12px;">
+            <select id="preset-select" style="flex:1; background:#000; color:#0f0; border:1px solid #333; font-size:12px; padding:4px; border-radius:4px;">
+                <option value="Default">Default</option>
+            </select>
+            <button id="save-preset-btn" style="background:#22c55e; color:black; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">SAVE</button>
+        </div>
+
         <div style="font-size:10px; color:#666; margin-bottom:4px;">STRATEGY</div>
         <select id="strategy-select" style="width:100%; background:#000; color:#0f0; border:1px solid #333; margin-bottom:12px; font-size:12px; padding:4px; border-radius:4px;">
             <option value="gto">GTO Solver</option>
@@ -57,14 +72,12 @@ function createCalibrationHub() {
         </select>
 
         <div style="font-size:10px; color:#666; margin-bottom:4px;">CUSTOM PROMPT</div>
-        <textarea id="custom-prompt-input" placeholder="e.g. Always check if pot > 100. Never fold pairs." style="width:100%; height:60px; background:#000; color:#0f0; border:1px solid #333; margin-bottom:15px; font-size:10px; padding:6px; border-radius:4px; resize:none;"></textarea>
+        <textarea id="custom-prompt-input" placeholder="e.g. Always check if pot > 100." style="width:100%; height:60px; background:#000; color:#0f0; border:1px solid #333; margin-bottom:15px; font-size:10px; padding:6px; border-radius:4px; resize:none;"></textarea>
 
         <button id="set-roi-btn" style="${btnS('#0088ff')}">1. Setup Turn Area (ROI)</button>
         <button id="set-ref-btn" style="${btnS('#ffaa00')}">2. Capture My Turn</button>
         
         <div style="margin:15px 0 8px 0; font-size:10px; color:#888; text-transform:uppercase; letter-spacing:1px;">Click Alignment</div>
-        <div style="font-size:9px; color:#555; margin-bottom:8px;">Drag circles to table buttons.</div>
-
         <button id="start-btn" style="${btnS('#0f0')} margin-top:10px; height:40px; font-size:14px;">START AI BOT</button>
         
         <div id="status" style="font-size:11px; margin-top:15px; padding:8px; background:#000; border-radius:6px; border-left:3px solid #666;">Status: Stopped</div>
@@ -74,6 +87,7 @@ function createCalibrationHub() {
     document.body.appendChild(hub);
     makeDraggable(hub);
 
+    // Event Handlers
     document.getElementById('start-btn').onclick = toggleAgent;
     document.getElementById('set-roi-btn').onclick = startROICalibration;
     document.getElementById('set-ref-btn').onclick = captureReference;
@@ -88,15 +102,54 @@ function createCalibrationHub() {
         chrome.storage.local.set({ currentStrategy });
     };
     document.getElementById('custom-prompt-input').onchange = (e) => {
-        chrome.storage.local.set({ customPrompt: e.target.value });
+        customPromptValue = e.target.value;
+        chrome.storage.local.set({ customPrompt: customPromptValue });
     };
 
-    // Set initial values
+    document.getElementById('save-preset-btn').onclick = () => {
+        const name = prompt("Enter site name (e.g. Winamax, PokerStars):", currentPresetName);
+        if (name) {
+            presets[name] = { roi, buttonCoords, turnRefHash };
+            currentPresetName = name;
+            chrome.storage.local.set({ presets, currentPresetName });
+            updatePresetDropdown();
+        }
+    };
+
+    document.getElementById('preset-select').onchange = (e) => {
+        const name = e.target.value;
+        if (presets[name]) {
+            currentPresetName = name;
+            roi = presets[name].roi;
+            buttonCoords = presets[name].buttonCoords;
+            turnRefHash = presets[name].turnRefHash;
+            chrome.storage.local.set({ currentPresetName, roi, buttonCoords, turnRefHash });
+            refreshMarkers();
+            document.getElementById('status').innerText = `Loaded: ${name}`;
+        }
+    };
+
+    // Initial population
+    updatePresetDropdown();
     if (apiKey) document.getElementById('api-key-input').value = apiKey;
     if (currentStrategy) document.getElementById('strategy-select').value = currentStrategy;
     if (customPromptValue) document.getElementById('custom-prompt-input').value = customPromptValue;
+}
 
-    refreshMarkers();
+function updatePresetDropdown() {
+    const sel = document.getElementById('preset-select');
+    if (!sel) return;
+    sel.innerHTML = '';
+    const names = Object.keys(presets).length > 0 ? Object.keys(presets) : ['Default'];
+    if (!presets['Default']) names.unshift('Default');
+
+    [...new Set(names)].forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        if (name === currentPresetName) opt.selected = true;
+        sel.appendChild(opt);
+    });
 }
 
 function btnS(c) {
@@ -106,7 +159,7 @@ function btnS(c) {
 function makeDraggable(el, onStop) {
     let p1 = 0, p2 = 0, p3 = 0, p4 = 0;
     el.onmousedown = (e) => {
-        if (['BUTTON', 'INPUT', 'SELECT'].includes(e.target.tagName)) return;
+        if (['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
         p3 = e.clientX; p4 = e.clientY;
         document.onmouseup = () => {
             document.onmouseup = null; document.onmousemove = null;
@@ -121,29 +174,34 @@ function makeDraggable(el, onStop) {
 
 function createMarker(id, label, color) {
     if (!IS_TOP_FRAME) return;
-    if (document.getElementById('marker-' + id)) return;
-
-    const m = document.createElement('div');
-    m.id = 'marker-' + id;
-    m.style.cssText = `
-        position: fixed; width: 60px; height: 60px;
-        background: ${color}44; border: 2px dashed ${color};
-        border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        color: white; font-weight: bold; font-size: 10px;
-        z-index: 2147483646; cursor: move; text-shadow: 0 0 3px black;
-        box-shadow: inset 0 0 10px ${color}88; pointer-events: auto;
-    `;
-    m.innerText = label;
+    let m = document.getElementById('marker-' + id);
+    if (!m) {
+        m = document.createElement('div');
+        m.id = 'marker-' + id;
+        m.style.cssText = `
+            position: fixed; width: 60px; height: 60px;
+            background: ${color}44; border: 2px dashed ${color};
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 10px;
+            z-index: 2147483646; cursor: move; text-shadow: 0 0 3px black;
+            box-shadow: inset 0 0 10px ${color}88; pointer-events: auto;
+        `;
+        m.innerText = label;
+        document.body.appendChild(m);
+        makeDraggable(m, (x, y) => {
+            buttonCoords[id] = { x: x + 30, y: y + 30 };
+            chrome.storage.local.set({ buttonCoords });
+            // Also update the current active preset
+            if (presets[currentPresetName]) {
+                presets[currentPresetName].buttonCoords = buttonCoords;
+                chrome.storage.local.set({ presets });
+            }
+        });
+    }
 
     const pos = buttonCoords[id] || { x: 100, y: 100 };
     m.style.left = pos.x - 30 + 'px';
     m.style.top = pos.y - 30 + 'px';
-
-    document.body.appendChild(m);
-    makeDraggable(m, (x, y) => {
-        buttonCoords[id] = { x: x + 30, y: y + 30 };
-        chrome.storage.local.set({ buttonCoords });
-    });
 }
 
 function refreshMarkers() {
@@ -186,6 +244,11 @@ async function captureReference() {
     if (h && h !== '0') {
         turnRefHash = h;
         chrome.storage.local.set({ turnRefHash });
+        if (presets[currentPresetName]) {
+            presets[currentPresetName].turnRefHash = turnRefHash;
+            presets[currentPresetName].roi = roi;
+            chrome.storage.local.set({ presets });
+        }
         status.innerText = 'Turn Calibrated!';
     } else {
         status.innerText = 'Capture Failed!';
@@ -209,6 +272,10 @@ function startROICalibration() {
     o.onmouseup = () => {
         roi = { x: parseInt(b.style.left), y: parseInt(b.style.top), width: parseInt(b.style.width), height: parseInt(b.style.height) };
         chrome.storage.local.set({ roi });
+        if (presets[currentPresetName]) {
+            presets[currentPresetName].roi = roi;
+            chrome.storage.local.set({ presets });
+        }
         o.remove(); b.remove();
         document.getElementById('status').innerText = 'ROI Set!';
     };
@@ -251,26 +318,21 @@ function performNativeClick(x, y) {
     const hub = document.getElementById('poker-pro-hub');
     const markers = ['fold', 'call', 'raise', 'sitback'].map(id => document.getElementById('marker-' + id));
 
-    // 1. Hide everything
     if (hub) hub.style.display = 'none';
     markers.forEach(m => { if (m) m.style.display = 'none'; });
 
-    // 2. Immediate Click Sequence (Reference Project Style)
     const el = document.elementFromPoint(x, y);
     if (el) {
-        console.log('Clicking:', el.tagName);
         const props = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, buttons: 1 };
         ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(t => el.dispatchEvent(new MouseEvent(t, props)));
         if (typeof el.click === 'function') el.click();
 
-        // Visual feedback
         const dot = document.createElement('div');
         dot.style.cssText = `position:fixed; left:${x - 2}px; top:${y - 2}px; width:4px; height:4px; background:red; border-radius:50%; z-index:2147483647; pointer-events:none;`;
         document.body.appendChild(dot);
         setTimeout(() => dot.remove(), 1000);
     }
 
-    // 3. Restore
     if (hub) hub.style.display = 'block';
     markers.forEach(m => { if (m) m.style.display = 'flex'; });
 }
@@ -292,5 +354,3 @@ chrome.runtime.onMessage.addListener((m) => {
         }
     }
 });
-
-if (IS_TOP_FRAME) createCalibrationHub();
