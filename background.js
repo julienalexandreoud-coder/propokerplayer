@@ -72,13 +72,14 @@ async function analyzeWithGemini(imageBase64) {
             `
         },
         nl2: {
-            title: "Micro-Stakes Specialist (NL2)",
-            goal: "Exploit weak, loose, and passive players in €0.01/€0.02 games.",
+            title: "Micro-Stakes & Winamax Specialist",
+            goal: "Euro-Pool Explosion: Exploit weak, loose, and passive players while beating high rake.",
             rules: `
-                - **Value is King**: Do not bluff 'calling stations'. Only bet if you have a strong hand.
-                - **Tight Pre-flop**: Avoid marginal hands due to high rake. Stick to premium/strong holdings.
-                - **Respect Raises**: At NL2, a raise usually means the nuts. Fold to aggression unless you have an elite hand.
-                - **Isolation**: Raise larger when in position to isolate fishy players.
+                - **3-Bet or Fold**: Due to high rake, avoid 'flat calling' pre-flop unless in the Big Blind. Either 3-Bet to take the pot now or Fold.
+                - **Value is King**: Micro-Stakes players hate folding. Never bluff 'calling stations'. Only bet if you have a strong hand or 8+ outs.
+                - **The €0.02 Exploitation**: If an opponent limps, raise 4x BB + 1 BB per limper. Isolate the fish.
+                - **Respect River Aggression**: If a passive player raises on the Turn or River, they have the nuts. FOLD unless you have an elite hand.
+                - **Overbet for Value**: On safe boards, use 1.2x pot bets to extract maximum value from stubborn recreational players.
             `
         },
         nit: {
