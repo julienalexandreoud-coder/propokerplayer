@@ -37,7 +37,8 @@ async function handleVisionAnalysis(tabId) {
         chrome.tabs.sendMessage(tabId, {
             type: 'SHOW_DECISION',
             recommendation: result.recommendation,
-            reasoning: stateInfo + result.reasoning
+            reasoning: stateInfo + result.reasoning,
+            state: result.detected_state // Pass state to help content script handle redirects
         });
     } catch (error) {
         console.error('Analysis failed:', error);
@@ -152,7 +153,7 @@ async function analyzeWithGemini(imageBase64) {
         ${config.rules}
         ${customPrompt ? `### USER CUSTOM RULES (PRIORITY):\n${customPrompt}` : ''}
         - If the pot is multi-way (3+ players), play more conservatively.
-        - **ACTION FALLBACK**: If you want to FOLD but only a "PASS" button is available, recommend "FOLD" (the system will click the Fold/Pass marker).
+        - **STRICT TECHNICAL RULE**: If the 'cost_to_call' is 0, or if you detect a "Check" or "Pass" button, you MUST recommend "Check" (or "Pass"). Many poker websites disable the "Fold" button when a free "Check" is available. To ensure the bot doesn't get stuck, you must never recommend "Fold" if it is free to stay in the hand.
 
         ### EXTRACTION RULES:
         1. Identify cards, stacks, pot, and dealer button precisely. 
