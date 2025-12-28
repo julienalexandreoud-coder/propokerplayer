@@ -70,10 +70,11 @@ async function handleVisionAnalysis(tab) {
 }
 
 async function analyzeWithGemini(imageBase64) {
-    const data = await chrome.storage.local.get(['apiKey', 'currentStrategy', 'customPrompt']);
+    const data = await chrome.storage.local.get(['apiKey', 'currentStrategy', 'customPrompt', 'bigBlind']);
     const key = data.apiKey;
     const strategy = data.currentStrategy || 'gto';
     const customPrompt = data.customPrompt || '';
+    const BB = data.bigBlind || 'Unknown';
     if (!key) throw new Error('API Key missing in storage');
 
     const cleanBase64 = imageBase64.split(',')[1];
@@ -163,16 +164,19 @@ async function analyzeWithGemini(imageBase64) {
         Act as a ${config.title}. Objective: ${config.goal}
         Analyze the provided screenshot with surgical precision.
 
-        ### STACK PRESERVATION RULES:
-        - **10% Rule**: Never treat 10% of your stack as "small" or "negligible." It is a significant investment. 
-        - **Risk vs. Equity**: Any call or raise exceeding 5% of your total stack requires a clear mathematical rationale (Pot Odds + Hand Equity).
-        - **Commitment Threshold**: If an action requires 30% or more of your stack, only proceed if you have a top-tier hand or a very high-equity draw.
-        - **Stack Awareness**: Always compare the 'cost_to_call' to your 'my_stack'. If you are getting short-stacked (<20 BB), shift to an 'All-in or Fold' strategy.
+        ### NUMERIC SANITY CHECK (CRITICAL):
+        - **Comma vs. Dot**: Poker sites often use dots as thousands separators OR as decimal points. 
+        - **Sanity Logic**: Compare the 'pot' to the 'my_stack' and 'cost_to_call'. If the call is "0.33" but your stack is "10,000", assume the "0.33" is actually "330" or "3300" (thousands confusion). 
+        - **Currency/Units**: If the game uses chips (e.g. 3000), do not convert them to dollars unless explicitly shown. Treat all numbers as relative to each other.
+        - **Estimated Big Blind**: Estimate the current Big Blind from common stack/bet increments. Normalize all values to this BB scale to avoid confusion.
 
-        ${config.rules}
-        ${customPrompt ? `### USER CUSTOM RULES (PRIORITY):\n${customPrompt}` : ''}
-        - If the pot is multi-way (3+ players), play more conservatively.
-        - **VISUAL FALLBACK**: Usually you can Fold for free. However, if you see that the "FOLD" button is physically GONE from the screen (hidden by the site), recommend "CHECK" or "PASS" instead so you don't click on empty space.
+        ### PRE-FLOP & EQUITY MANDATE:
+        - **Street Consistency**: Your equity analysis MUST begin from the Pre-Flop range. Do not wait for the Flop to calculate your hand strength.
+        - **Range-Based Equity**: Compare your hand against a standard opponent range for the current street. 
+        - **Winning Probability**: In your reasoning, explicitly state your estimated win % (Equity) against their range.
+
+        ### VISUAL FALLBACK:
+        - Usually you can Fold for free. However, if you see that the "FOLD" button is physically GONE from the screen (hidden by the site), recommend "CHECK" or "PASS" instead so you don't click on empty space.
 
         ### EXTRACTION RULES:
         1. Identify cards, stacks, pot, and dealer button precisely. 
@@ -185,14 +189,15 @@ async function analyzeWithGemini(imageBase64) {
             "detected_state": {
                 "my_cards": ["card1", "card2"],
                 "board": ["board_cards"],
-                "pot": "extracted_pot_value",
+                "pot": "extracted_total_pot",
                 "my_stack": "extracted_stack_value",
-                "cost_to_call": "extracted_button_text_value",
-                "position": "extracted_position",
-                "effective_stack": "calculated_value"
+                "cost_to_call": "extracted_numeric_value_from_call_button",
+                "detected_big_blind": "inferred_big_blind_value",
+                "street": "preflop/flop/turn/river",
+                "equity_estimate": "your_percentage_0_to_100_based_on_preflop_onwards"
             },
             "recommendation": "Fold/Call/Raise/Check",
-            "reasoning": "Explain the decision as a ${config.title}. Mention how the specific strategy rules applied to this hand."
+            "reasoning": "Explain the decision as a ${config.title}. 1) Numerical Validation (Confirm you didn't mistake decimal for thousand). 2) Pre-flop Logic: How your starting hand fits this street. 3) Equity calculation against opponent's probable range."
         }
     `;
 

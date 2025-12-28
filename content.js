@@ -19,9 +19,10 @@ let currentPresetName = 'Default';
 let matchThreshold = 25000;
 let actionCooldown = 3000;
 let sitBackTimeout = 45000;
+let bigBlind = '100';
 
 // Load initial config
-chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash', 'customPrompt', 'presets', 'currentPresetName', 'customStrategies', 'matchThreshold', 'actionCooldown', 'sitBackTimeout'], (data) => {
+chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash', 'customPrompt', 'presets', 'currentPresetName', 'customStrategies', 'matchThreshold', 'actionCooldown', 'sitBackTimeout', 'bigBlind'], (data) => {
     if (data.roi) roi = data.roi;
     if (data.buttonCoords) buttonCoords = data.buttonCoords;
     if (data.apiKey) apiKey = data.apiKey;
@@ -34,6 +35,7 @@ chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 't
     if (data.matchThreshold) matchThreshold = data.matchThreshold;
     if (data.actionCooldown) actionCooldown = data.actionCooldown;
     if (data.sitBackTimeout) sitBackTimeout = data.sitBackTimeout;
+    if (data.bigBlind) bigBlind = data.bigBlind;
 
     if (IS_TOP_FRAME) {
         createCalibrationHub();
@@ -61,11 +63,12 @@ function createCalibrationHub() {
         
         <input type="password" id="api-key-input" placeholder="Gemini API Key" style="width:100%; background:#050505; color:#0f0; border:1px solid #222; margin-bottom:12px; font-size:11px; padding:8px; border-radius:4px;">
         
-        <div style="font-size:9px; color:#444; margin-bottom:4px; text-transform:uppercase;">1. Site Layout</div>
+        <div style="font-size:9px; color:#444; margin-bottom:4px; text-transform:uppercase;">1. Site & Stakes</div>
         <div style="display:flex; gap:4px; margin-bottom:12px;">
-            <select id="preset-select" style="flex:1; background:#050505; color:#0f0; border:1px solid #222; font-size:11px; padding:4px; border-radius:4px;">
+            <select id="preset-select" style="flex:2; background:#050505; color:#0f0; border:1px solid #222; font-size:11px; padding:4px; border-radius:4px;">
                 <option value="Default">Default</option>
             </select>
+            <input type="text" id="bb-input" value="${bigBlind}" placeholder="BB" style="flex:1; background:#050505; color:#0f0; border:1px solid #222; font-size:11px; padding:4px; border-radius:4px; text-align:center;">
             <button id="save-preset-btn" style="background:#22c55e; color:black; border:none; padding:4px 8px; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">SAVE</button>
         </div>
 
@@ -154,6 +157,11 @@ function createCalibrationHub() {
         sitBackTimeout = parseInt(e.target.value);
         document.getElementById('sitback-val').innerText = (sitBackTimeout / 1000).toFixed(0) + 's';
         chrome.storage.local.set({ sitBackTimeout });
+    };
+
+    document.getElementById('bb-input').onchange = (e) => {
+        bigBlind = e.target.value;
+        chrome.storage.local.set({ bigBlind });
     };
 
     document.getElementById('api-key-input').onchange = (e) => {
@@ -513,9 +521,16 @@ chrome.runtime.onMessage.addListener((m) => {
                 rec.includes('raise') ? 'raise' : null;
 
         if (IS_TOP_FRAME) {
-            document.getElementById('status').innerText = 'RECOMMEND: ' + m.recommendation;
+            const equity = m.detected_state?.equity_estimate || '??';
+            const street = m.detected_state?.street || '??';
+            document.getElementById('status').innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:white; font-weight:bold;">${m.recommendation}</span>
+                    <span style="font-size:9px; background:#222; padding:2px 4px; border-radius:3px;">Equity: ${equity}%</span>
+                </div>
+            `;
             document.getElementById('status').style.color = '#ffffff';
-            document.getElementById('reasoning').innerText = m.reasoning;
+            document.getElementById('reasoning').innerText = `Street: ${street.toUpperCase()}\n${m.reasoning}`;
             document.getElementById('reasoning').style.display = 'block';
         }
 
