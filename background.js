@@ -142,6 +142,12 @@ async function analyzeWithGemini(imageBase64) {
         Act as a ${config.title}. Objective: ${config.goal}
         Analyze the provided screenshot with surgical precision.
 
+        ### STACK PRESERVATION RULES:
+        - **10% Rule**: Never treat 10% of your stack as "small" or "negligible." It is a significant investment. 
+        - **Risk vs. Equity**: Any call or raise exceeding 5% of your total stack requires a clear mathematical rationale (Pot Odds + Hand Equity).
+        - **Commitment Threshold**: If an action requires 30% or more of your stack, only proceed if you have a top-tier hand or a very high-equity draw.
+        - **Stack Awareness**: Always compare the 'cost_to_call' to your 'my_stack'. If you are getting short-stacked (<20 BB), shift to an 'All-in or Fold' strategy.
+
         ### STRATEGY RULES:
         ${config.rules}
         ${customPrompt ? `### USER CUSTOM RULES (PRIORITY):\n${customPrompt}` : ''}
