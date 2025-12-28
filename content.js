@@ -415,7 +415,7 @@ async function loop() {
             }
         }
     }
-    setTimeout(loop, 250); // Faster checks
+    setTimeout(loop, 500); // 500ms is the safe limit to avoid Chrome quota errors
 }
 
 function performNativeClick(x, y) {

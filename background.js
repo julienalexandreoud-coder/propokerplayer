@@ -22,19 +22,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleVisionAnalysis(tab) {
     const tabId = tab.id;
     const windowId = tab.windowId;
+    let retries = 3;
+    let dataUrl = null;
+
     try {
         console.log('Capturing for Gemini...');
-        const dataUrl = await new Promise((resolve, reject) => {
-            chrome.tabs.captureVisibleTab(windowId, { format: 'png' }, (dataUrl) => {
-                if (chrome.runtime.lastError) {
-                    reject(new Error(chrome.runtime.lastError.message));
-                } else if (!dataUrl) {
-                    reject(new Error('Failed to capture screen (DataURL empty)'));
+        while (retries > 0) {
+            try {
+                dataUrl = await new Promise((resolve, reject) => {
+                    chrome.tabs.captureVisibleTab(windowId, { format: 'png' }, (dataUrl) => {
+                        if (chrome.runtime.lastError) {
+                            reject(new Error(chrome.runtime.lastError.message));
+                        } else if (!dataUrl) {
+                            reject(new Error('Failed to capture screen (DataURL empty)'));
+                        } else {
+                            resolve(dataUrl);
+                        }
+                    });
+                });
+                break; // Success!
+            } catch (e) {
+                if (e.message.includes('MAX_CAPTURE') && retries > 1) {
+                    console.log('Capture quota exceeded, retrying in 100ms...');
+                    await new Promise(r => setTimeout(r, 100));
+                    retries--;
                 } else {
-                    resolve(dataUrl);
+                    throw e; // Final failure or different error
                 }
-            });
-        });
+            }
+        }
 
         const result = await analyzeWithGemini(dataUrl);
 
