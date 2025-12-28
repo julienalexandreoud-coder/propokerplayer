@@ -11,6 +11,7 @@ let currentStrategy = 'gto';
 let turnRefHash = '';
 let isTurnActive = false;
 let lastTurnTime = Date.now();
+let isLoopPaused = false;
 let customPromptValue = '';
 let presets = {}; // Site presets (Layouts)
 let customStrategies = {}; // User-made strategy prompts
@@ -362,6 +363,7 @@ function toggleAgent() {
 
 async function loop() {
     if (!isScanning || !IS_TOP_FRAME) return;
+    if (isLoopPaused) { setTimeout(loop, 500); return; }
     const h = await getHash();
     const current = parseInt(h) || 0;
     const target = parseInt(turnRefHash) || 0;
@@ -376,6 +378,10 @@ async function loop() {
             document.getElementById('status').innerText = '🔥 ACTIVE' + debug;
             document.getElementById('status').style.color = '#ffaa00';
             chrome.runtime.sendMessage({ type: 'PERFORM_ANALYSIS' });
+
+            isLoopPaused = true;
+            document.getElementById('status').innerText = '🤖 THINKING' + debug;
+            setTimeout(() => { isLoopPaused = false; }, 3000);
         }
     } else {
         isTurnActive = false;
