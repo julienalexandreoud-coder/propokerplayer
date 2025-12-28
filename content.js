@@ -398,11 +398,15 @@ async function loop() {
 
             isLoopPaused = true;
             document.getElementById('status').innerText = '🤖 THINKING' + debug;
-            setTimeout(() => { isLoopPaused = false; }, 3000);
+            setTimeout(() => {
+                isLoopPaused = false;
+                isTurnActive = false; // Force reset after pause to allow fresh detection
+            }, 3000);
         }
     } else {
+        const matchP = target > 0 ? Math.max(0, Math.floor((1 - diff / 50000) * 100)) : 0;
         isTurnActive = false;
-        document.getElementById('status').innerText = 'WAITING...' + debug;
+        document.getElementById('status').innerText = `WATCHING: ${matchP}% match${debug}`;
         document.getElementById('status').style.color = '#888';
 
         // Check for 45-second inactivity
@@ -438,8 +442,11 @@ function performNativeClick(x, y) {
         setTimeout(() => dot.remove(), 1000);
     }
 
-    if (hub) hub.style.display = 'block';
-    markers.forEach(m => { if (m) m.style.display = 'flex'; });
+    // UI PERSISTENCE: Bring back the control panel after the click is done
+    setTimeout(() => {
+        if (hub) hub.style.display = 'block';
+        markers.forEach(m => { if (m) m.style.display = 'flex'; });
+    }, 3000);
 }
 
 chrome.runtime.onMessage.addListener((m) => {
