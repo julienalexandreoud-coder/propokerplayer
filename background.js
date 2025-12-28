@@ -50,9 +50,10 @@ async function handleVisionAnalysis(tabId) {
 }
 
 async function analyzeWithGemini(imageBase64) {
-    const data = await chrome.storage.local.get(['apiKey', 'currentStrategy']);
+    const data = await chrome.storage.local.get(['apiKey', 'currentStrategy', 'customPrompt']);
     const key = data.apiKey;
     const strategy = data.currentStrategy || 'gto';
+    const customPrompt = data.customPrompt || '';
     if (!key) throw new Error('API Key missing in storage');
 
     const cleanBase64 = imageBase64.split(',')[1];
@@ -114,6 +115,24 @@ async function analyzeWithGemini(imageBase64) {
                 - Risk-averse near the bubble. Highly aggressive when short-stacked (<15 BB).
                 - Factor in the risk of elimination vs. chip gain.
             `
+        },
+        spin: {
+            title: "Spin & Go Specialist",
+            goal: "Elite 3-Max performance.",
+            rules: `
+                - Be extremely aggressive pre-flop. 3-Max is won by the aggressor.
+                - Wider ranges for all-in shoves when <= 10 BB.
+                - Punish limpers relentlessly.
+            `
+        },
+        cash: {
+            title: "Cash Game Grinder",
+            goal: "Steady, deep-stack profit consolidation.",
+            rules: `
+                - Play very tight pre-flop against early position raises.
+                - Maximize value on later streets (Turn/River).
+                - Don't force big bluffs unless you have a serious read on the board texture.
+            `
         }
     };
 
@@ -125,8 +144,8 @@ async function analyzeWithGemini(imageBase64) {
 
         ### STRATEGY RULES:
         ${config.rules}
+        ${customPrompt ? `### USER CUSTOM RULES:\n${customPrompt}` : ''}
         - If the pot is multi-way (3+ players), play more conservatively.
-        - **STRICT RULE**: NEVER recommend Folding if the button says "Check" or the cost is 0. ALWAYS Check if it is free.
 
         ### EXTRACTION RULES:
         1. Identify cards, stacks, pot, and dealer button precisely. Look at button labels for Call/Check cost.

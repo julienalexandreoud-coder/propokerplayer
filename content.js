@@ -12,14 +12,17 @@ let turnRefHash = '';
 let isTurnActive = false;
 
 // Load config
-chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash'], (data) => {
+chrome.storage.local.get(['roi', 'buttonCoords', 'apiKey', 'currentStrategy', 'turnRefHash', 'customPrompt'], (data) => {
     if (data.roi) roi = data.roi;
     if (data.buttonCoords) buttonCoords = data.buttonCoords;
     if (data.apiKey) apiKey = data.apiKey;
     if (data.currentStrategy) currentStrategy = data.currentStrategy;
     if (data.turnRefHash) turnRefHash = data.turnRefHash;
+    if (data.customPrompt) customPromptValue = data.customPrompt;
     if (IS_TOP_FRAME) refreshMarkers();
 });
+
+let customPromptValue = '';
 
 function createCalibrationHub() {
     if (!IS_TOP_FRAME) return;
@@ -42,14 +45,19 @@ function createCalibrationHub() {
         <input type="password" id="api-key-input" placeholder="Gemini API Key" style="width:100%; background:#000; color:#0f0; border:1px solid #333; margin-bottom:12px; font-size:11px; padding:6px; border-radius:4px;">
         
         <div style="font-size:10px; color:#666; margin-bottom:4px;">STRATEGY</div>
-        <select id="strategy-select" style="width:100%; background:#000; color:#0f0; border:1px solid #333; margin-bottom:15px; font-size:12px; padding:4px; border-radius:4px;">
+        <select id="strategy-select" style="width:100%; background:#000; color:#0f0; border:1px solid #333; margin-bottom:12px; font-size:12px; padding:4px; border-radius:4px;">
             <option value="gto">GTO Solver</option>
+            <option value="cash">Cash Game Grinder</option>
+            <option value="tournament">Tournament Master</option>
+            <option value="spin">Spin & Go Specialist</option>
             <option value="nl2">Micro Stakes (NL2)</option>
             <option value="nit">Nit (Ultra Tight)</option>
             <option value="tag">TAG (Aggressive)</option>
             <option value="lag">LAG (Loose)</option>
-            <option value="tournament">Tournament</option>
         </select>
+
+        <div style="font-size:10px; color:#666; margin-bottom:4px;">CUSTOM PROMPT</div>
+        <textarea id="custom-prompt-input" placeholder="e.g. Always check if pot > 100. Never fold pairs." style="width:100%; height:60px; background:#000; color:#0f0; border:1px solid #333; margin-bottom:15px; font-size:10px; padding:6px; border-radius:4px; resize:none;"></textarea>
 
         <button id="set-roi-btn" style="${btnS('#0088ff')}">1. Setup Turn Area (ROI)</button>
         <button id="set-ref-btn" style="${btnS('#ffaa00')}">2. Capture My Turn</button>
@@ -79,10 +87,14 @@ function createCalibrationHub() {
         currentStrategy = e.target.value;
         chrome.storage.local.set({ currentStrategy });
     };
+    document.getElementById('custom-prompt-input').onchange = (e) => {
+        chrome.storage.local.set({ customPrompt: e.target.value });
+    };
 
     // Set initial values
     if (apiKey) document.getElementById('api-key-input').value = apiKey;
     if (currentStrategy) document.getElementById('strategy-select').value = currentStrategy;
+    if (customPromptValue) document.getElementById('custom-prompt-input').value = customPromptValue;
 
     refreshMarkers();
 }
