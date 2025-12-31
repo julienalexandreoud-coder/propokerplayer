@@ -2,6 +2,12 @@
 
 let lastCaptureResult = null;
 let lastCaptureTime = 0;
+let localHUD = {}; // { "PlayerName": { hands:0, vpip:0, pfr:0, lastSeen: Date } }
+
+// Load HUD from storage on start
+chrome.storage.local.get(['localHUD'], (res) => {
+    if (res.localHUD) localHUD = res.localHUD;
+});
 
 async function getThrottledCapture(windowId) {
     const now = Date.now();
@@ -35,29 +41,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.type === 'PERFORM_ANALYSIS') {
-        handleVisionAnalysis(sender.tab);
+        handleVisionAnalysis(sender.tab, message.localMetadata, message.cleanDataUrl);
         return true;
     }
 });
 
-async function handleVisionAnalysis(tab) {
+async function handleVisionAnalysis(tab, localMetadata = "", cleanDataUrl = null) {
     const tabId = tab.id;
     const windowId = tab.windowId;
 
     try {
-        console.log('Capturing for Gemini...');
-        const dataUrl = await getThrottledCapture(windowId);
-        const result = await analyzeWithGemini(dataUrl);
+        console.log('Processing analysis request...');
+        let dataUrl = cleanDataUrl;
 
-        // Combine detected state with reasoning for the user
-        const stateInfo = result.detected_state ?
-            `Seen: ${result.detected_state.my_cards.join(',')} | Pot: ${result.detected_state.pot} | Call: ${result.detected_state.cost_to_call}\n\n` : '';
+        // If content script didn't provide a clean screenshot, capture one now
+        if (!dataUrl) {
+            console.log('Capturing for Gemini (background fallback)...');
+            dataUrl = await getThrottledCapture(windowId);
+        } else {
+            console.log('Using clean screenshot from content script.');
+        }
+
+        const result = await analyzeWithGemini(dataUrl, localMetadata);
+
+        // Update HUD stats if opponents are detected
+        if (result.detected_state && result.detected_state.opponents) {
+            updateHUD(result.detected_state.opponents, result.detected_state.street);
+        }
 
         chrome.tabs.sendMessage(tabId, {
             type: 'SHOW_DECISION',
             recommendation: result.recommendation,
-            reasoning: stateInfo + result.reasoning,
-            state: result.detected_state // Pass state to help content script handle redirects
+            reasoning: result.reasoning,
+            state: result.detected_state,
+            hud: localHUD // Pass HUD back to UI
         });
     } catch (error) {
         console.error('Analysis failed:', error);
@@ -69,7 +86,7 @@ async function handleVisionAnalysis(tab) {
     }
 }
 
-async function analyzeWithGemini(imageBase64) {
+async function analyzeWithGemini(imageBase64, localMetadata = "") {
     const data = await chrome.storage.local.get(['apiKey', 'currentStrategy', 'customPrompt', 'bigBlind']);
     const key = data.apiKey;
     const strategy = data.currentStrategy || 'gto';
@@ -82,13 +99,28 @@ async function analyzeWithGemini(imageBase64) {
 
     // Define strategy-specific logic
     const strategyConfigs = {
-        gto: {
-            title: "High-Stakes GTO Solver",
-            goal: "Maximize EV (Expected Value) at all costs.",
+        gemini: {
+            title: "Gemini's Elite Pro Strategy",
+            goal: "Dominate the table using a hybrid GTO-Exploitative approach.",
             rules: `
-                - Adhere to strict 6-Max TAG ranges pre-flop (Fold bottom 80%).
-                - Use GTO frequencies post-flop. Balance Value Bets with Bluffs.
-                - If the opponent is short-stacked, increase 'All-in' pressure.
+                ### 1. MATHEMATICAL FOUNDATION (GTO)
+                - **Pot Odds vs Equity**: Mandatory break-even check. If equity < cost_to_call, FOLD unless semi-bluffing.
+                - **Range Balancing**: Ensure a balanced mix of Value Bets and Bluffs. Never be predictable.
+                - **MDF (Minimum Defense Frequency)**: On the river, defense % = 1 / (Opponent Bet Size + 1).
+                - **Blockers**: Factor in how your hole cards block opponent's Nut Flush/Straight combos.
+                - **SPR Awareness**: Commit early with strong draws if SPR < 3. Play cautiously if SPR > 15.
+
+                ### 2. EXPLOITATIVE ANALYSIS
+                - **Frequency Analysis**: Identify if opponents are "Whales" (VPIP > 50) or "Nits" (VPIP < 10).
+                - **Bet Sizing Tells**: Scrutinize if large bets correlate with strength or desperation.
+                - **Timing Tells**: Assume quick checks are weak. Long tanks on dry boards indicate marginal decisions.
+                - **Fold-to-Stat**: Attack players who fold to C-Bets > 60% of the time.
+
+                ### 3. CONTEXTUAL & DEEP ANALYSIS
+                - **Positional Advantage**: Open wider from BTN/CO. Be extremely tight from UTG.
+                - **ICM & Bubble (Tourney)**: Prioritize survival near pay jumps. Attack short stacks as a big stack.
+                - **Multi-way Dynamics**: In 3+ player pots, tighten ranges significantly. Equity requirements increase.
+                - **Information Hiding**: Occasionally use 'Mixed Strategies' (Call with AA to trap, Raise with 76s to balance).
             `
         },
         nl2: {
@@ -162,29 +194,28 @@ async function analyzeWithGemini(imageBase64) {
 
     const prompt = `
         Act as a ${config.title}. Objective: ${config.goal}
-        Analyze the provided screenshot with surgical precision.
+        
+        ### GROUND TRUTH (LOCAL VISION ENGINE):
+        These values are extracted locally and are 100% ACCURATE. Use them to override any visual uncertainty:
+        ${localMetadata}
 
-        ### NUMERIC SANITY CHECK (CRITICAL):
-        - **Comma vs. Dot**: Poker sites often use dots as thousands separators OR as decimal points. 
-        - **Sanity Logic**: Compare the 'pot' to the 'my_stack' and 'cost_to_call'. If the call is "0.33" but your stack is "10,000", assume the "0.33" is actually "330" or "3300" (thousands confusion). 
-        - **Currency/Units**: If the game uses chips (e.g. 3000), do not convert them to dollars unless explicitly shown. Treat all numbers as relative to each other.
-        - **Estimated Big Blind**: Estimate the current Big Blind from common stack/bet increments. Normalize all values to this BB scale to avoid confusion.
+        ### POSITIONAL & STRATEGIC MANDATE:
+        - **Position Calculation**: Using the "Dealer Button" seat (e.g., P3) and the total "Active Opponents", determine your relative position (BTN, SB, BB, UTG, HJ, CO). 
+        - **Hero Identification**: You are the "Hero". If "Hero Active: YES", it is your turn and you are currently looking at your own hole cards.
+        - **Street-Awareness**: If the metadata says "Street: FLOP", identify the 3 cards. If it says "Street: RIVER", identify all 5.
+        - **Board Analysis (CRITICAL)**: Use the BOARD_CARD_LOCATION hints in the metadata to find the board cards. You MUST identify the rank and suit of every card in those specified [x, y, w, h] regions.
+        - **Dynamic Ranges**: Adjust your aggression based on "Active Opponents". In a 9-handed game, be tighter from early positions. In a 3-handed game, be much more aggressive.
+        
+        ### CUSTOM STRATEGY INSTRUCTIONS (HIGH PRIORITY):
+        ${customPrompt}
 
-        ### PRE-FLOP & EQUITY MANDATE:
-        - **Street Consistency**: Your equity analysis MUST begin from the Pre-Flop range. Do not wait for the Flop to calculate your hand strength.
-        - **Range-Based Equity**: Compare your hand against a standard opponent range for the current street. 
-        - **Winning Probability**: In your reasoning, explicitly state your estimated win % (Equity) against their range.
-
-        ### VISUAL FALLBACK:
-        - Usually you can Fold for free. However, if you see that the "FOLD" button is physically GONE from the screen (hidden by the site), recommend "CHECK" or "PASS" instead so you don't click on empty space.
-
-        ### EXTRACTION RULES:
-        1. Identify cards, stacks, pot, and dealer button precisely. 
-        2. **SCRUTINIZE BUTTONS**: Look at the text on every button. 
-        3. If cards are unclear, use suits and shapes for best-effort inference.
+        ### NUMERIC & VISUAL SANITY:
+        - **Currency**: Identify if values are in Dollars, Euros, or tournament Chips.
+        - **Pot vs Stack**: Ensure the 'cost_to_call' is mathematically consistent with the 'pot' and 'my_stack'.
+        - **Button Scrutiny**: Look at the text on action buttons (Fold, Check, Call, Raise, All-In).
 
         ### OUTPUT FORMAT:
-        Return ONLY a JSON object. Extract the REAL numbers from the image.
+        Return ONLY a JSON object.
         {
             "detected_state": {
                 "my_cards": ["card1", "card2"],
@@ -193,11 +224,16 @@ async function analyzeWithGemini(imageBase64) {
                 "my_stack": "extracted_stack_value",
                 "cost_to_call": "extracted_numeric_value_from_call_button",
                 "detected_big_blind": "inferred_big_blind_value",
-                "street": "preflop/flop/turn/river",
-                "equity_estimate": "your_percentage_0_to_100_based_on_preflop_onwards"
+                "street": "match_metadata_street",
+                "my_position": "BTN/SB/BB/UTG/etc",
+                "active_opponents": "count_from_metadata",
+                "equity_estimate": "0-100",
+                "opponents": [
+                    {"name": "extracted_name", "seat": "P1", "action": "Fold/Call/Raise/Active/Unknown"}
+                ]
             },
-            "recommendation": "Fold/Call/Raise/Check",
-            "reasoning": "Explain the decision as a ${config.title}. 1) Numerical Validation (Confirm you didn't mistake decimal for thousand). 2) Pre-flop Logic: How your starting hand fits this street. 3) Equity calculation against opponent's probable range."
+            "recommendation": "Fold/Call/Raise/Check/All-In",
+            "reasoning": "Explain as a ${config.title}. 1) Position & Context: Mention your seat relative to the Button and the number of active players. 2) Math: Calculate EXACT Pot Odds (e.g. 'I need 25% equity to call 100 into a 400 pot') and compare to your estimated equity. 3) HUD Analysis: If you recognize a name from previous hands (mention it!), use their tendencies (e.g. 'PlayerX is a whale') to justify an exploit. 4) Strategy: Why this action fits your specific goal."
         }
     `;
 
@@ -231,4 +267,39 @@ async function analyzeWithGemini(imageBase64) {
         console.error('Failed to parse Gemini response', e, result);
         throw new Error('AI returned an invalid format. Check the image quality.');
     }
+}
+
+let lastHandTimestamp = Date.now();
+setInterval(() => { lastHandTimestamp = Date.now(); }, 60000);
+
+function updateHUD(opponents, street) {
+    opponents.forEach(opp => {
+        if (!opp.name || opp.name === 'Unknown') return;
+
+        // Sanitize name
+        const cleanName = opp.name.trim();
+        if (!cleanName) return;
+
+        if (!localHUD[cleanName]) {
+            localHUD[cleanName] = { hands: 0, vpip: 0, pfr: 0, lastSeen: Date.now() };
+        }
+
+        const stats = localHUD[cleanName];
+        stats.lastSeen = Date.now();
+
+        if (!stats.lastHandId || stats.lastHandId !== lastHandTimestamp) {
+            stats.hands = (stats.hands || 0) + 1;
+            stats.lastHandId = lastHandTimestamp;
+            stats.hasActedInHand = false;
+        }
+
+        if ((opp.action === 'Raise' || opp.action === 'Call') && !stats.hasActedInHand) {
+            stats.vpip = (stats.vpip || 0) + 1;
+            stats.hasActedInHand = true;
+            if (street === 'PREFLOP' && opp.action === 'Raise') {
+                stats.pfr = (stats.pfr || 0) + 1;
+            }
+        }
+    });
+    chrome.storage.local.set({ localHUD });
 }

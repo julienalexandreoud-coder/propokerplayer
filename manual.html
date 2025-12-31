@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Poker Assistant Pro - Manual</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0a;
+            color: #eee;
+            line-height: 1.6;
+            padding: 40px;
+            max-width: 800px;
+            margin: auto;
+        }
+
+        h1 {
+            color: #a78bfa;
+            border-bottom: 2px solid #222;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #f59e0b;
+            margin-top: 30px;
+        }
+
+        .code {
+            background: #111;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            border: 1px solid #333;
+        }
+
+        .step {
+            margin-bottom: 20px;
+        }
+
+        .note {
+            background: #1e1b4b;
+            color: #c4b5fd;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #6366f1;
+        }
+
+        img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🎯 Poker Assistant Pro: Calibration Manual</h1>
+
+    <div class="note">
+        <strong>IMPORTANT:</strong> If you move or resize your poker window, you must recalibrate.
+    </div>
+
+    <h2>1. Turn Detection (The Engine)</h2>
+    <div class="step">
+        <strong>Step 1: Set Turn ROI</strong><br>
+        Click the button and drag a box over an area that <strong>changes ONLY when it is your turn</strong>.
+        Good examples: Your action buttons area, your time bar, or your own cards.
+    </div>
+    <div class="step">
+        <strong>Step 2: Sync Idle & Active</strong><br>
+        Wait until it is <strong>NOT your turn</strong>. Click "Sync Idle". Then wait until it <strong>IS your
+            turn</strong> and click "Sync Active". This dual-state matching makes the engine 10x more resilient to
+        background changes.
+    </div>
+    <div class="step">
+        <strong>Step 3: Adjust Sensitivity</strong><br>
+        Look at the <strong>Match Percentage</strong> in the Hub status. It should be 100% when waiting, and drop
+        significantly when it is your turn. If it doesn't drop enough to trigger "Active", increase the slider.
+    </div>
+
+    <h2>2. Table Metadata (The Context)</h2>
+    <div class="step">
+        <strong>Map Button Ref:</strong> Drag a small box over your site's "Dealer Button" icon. This is used for all
+        P1b-P9b detections.
+    </div>
+    <div class="step">
+        <strong>P1-P9 Status:</strong> Mapping at least 5 players is recommended for range analysis.
+    </div>
+    <div class="step">
+        <strong>Hero (Myself):</strong> Map your own seat so the AI knows which player you are.
+    </div>
+    <div class="step">
+        <strong>Card 1-5:</strong> Map the specific slots where board cards appear. The AI uses this to detect if it's
+        the <strong>FLOP, TURN, or RIVER</strong> automatically.
+    </div>
+
+    <h2>3. Pro-Tier Mapping (v6.0)</h2>
+    <div class="step">
+        <strong>Map Names (P1N-P9N):</strong> Create small regions over each player's username. This enables the
+        <strong>Session HUD</strong> to track stats by name, not just seat.
+    </div>
+    <div class="step">
+        <strong>Map Pot & Stack:</strong> Map the "Total Pot" area and your own "Stack" number. This gives the AI
+        perfect financial data for Math calculations.
+    </div>
+
+    <h2>4. Auto-Clickers (Execution)</h2>
+    <div class="step">
+        Drag the <strong>FOLD</strong>, <strong>CALL</strong>, <strong>RAISE</strong>, and <strong>SIT</strong> markers
+        directly over the center of your table's buttons.
+    </div>
+
+    <h2>5. Saving Site Presets</h2>
+    <div class="step">
+        Once happy, go to the <strong>STRATEGY</strong> tab, type a site name (e.g., "PokerStars"), and click
+        <strong>SAVE</strong>. This saves 100% of your calibration for that site.
+    </div>
+</body>
+
+</html>
